@@ -137,7 +137,6 @@
             box: '#question',
             header: 'Questões e Respostas',
             show: { header: true, columnHeaders: false, footer: true },
-            name: 'question',
             columns: [
                 { field: 'name', text: 'Name', size: '120px', style: 'background-color: #efefef; border-bottom: 1px solid white; padding-right: 5px;', attr: "align=right" },
                 { field: 'value', text: 'Value', size: '100%', editable: { type: 'text' }},

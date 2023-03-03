@@ -13,7 +13,7 @@
     </x-slot>
 
     @foreach ($questions as $question)
-    <div class="py-12">
+    <div class="py-12" id="mainDiv{{$question->id}}">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg question" id="question_id_{{$question->id}}">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
@@ -67,6 +67,7 @@
                 </div>
             </div>
         </div>
+    </div>
         @endforeach
 </x-app-layout>
 
@@ -139,7 +140,8 @@
                     popup('Feedback enviado', response.msg);
                     // alert(response.msg);
 
-                    renderNotaFinal(response.nota, response.media);
+                    location.reload();
+                    // renderNotaFinal(response.nota, response.media);
                 },
                 error: (xhr, status, error) => {
                     console.log(xhr, status, error);
@@ -210,7 +212,7 @@
                 .attr('hidden', false);
 
             setTimeout(() => {
-                $(`#alert_${id}`).empty();
+                $(`#alert_${id}`).empty().attr('hidden', true);
             }, 5000);
         }
 
@@ -230,6 +232,13 @@
                             <h5 style="font-weight: 500">
                                 A média é ${media} pontos.
                             </h5>
+                        </div>
+                    </div>
+                    <div class="row justify-content-md-center">
+                        <div class="col-md-12 text-center text-uppercase" id="gridContainer">
+                            <div id="user" style="display: inline-block; width: 100%; height: 300px;">
+                                <h4 class="text-uppercase text-center" style="margin-top: 50px; color: rgba(0, 44, 255, 0.5)">carregando respostas</h4>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -295,7 +304,8 @@
                     $(`#question_id_${id}`).animate({
                         opacity: 0.1
                     }, 800, complete => {
-                        $(`#question_id_${id}`).remove();
+                        // $(`#question_id_${id}`).remove();
+                        $(`#mainDiv${id}`).remove();
                     });
 
                     setTimeout(f => {
@@ -349,14 +359,135 @@
             w2ui['grid'].refresh();
         }
 
-        $('#query_input_id_1').val('select * from clientes;');
-
         @if(!$gaveFeedback)
         if (!$('.question').length) {
             renderModalFeedback();
         }
         @elseif($gaveFeedback)
-        getNotaAjax()
+        getNotaAjax();
+
+        let records = [];
+
+        @foreach (Auth::user()->questions as $userQuestion)
+            records.push({
+                recid: '{{ $userQuestion->id }}',
+                pergunta: `{!! $userQuestion->question->pergunta !!}`,
+                resposta: `{!! $userQuestion->resposta !!}`,
+                nota: `{!! $userQuestion->valor . ' / ' . $userQuestion->question->valor !!}`,
+                resposta_correta: `{!! $userQuestion->question->resposta !!}`,
+                error_msg: `{!! $userQuestion->error_msg !!}`,
+                w2ui: {
+                    style: "background-color: {{ $userQuestion->question->valor != $userQuestion->valor ? 'rgba(255, 0, 0, 0.2);' : 'rgba(0, 255, 0, 0.2);' }}",
+                }
+            });
+        @endforeach
+
+        setTimeout(f => {
+            $('#user').w2grid({
+                name: 'user',
+                box: '#user',
+                header: 'Questões e Respostas',
+                show: { header: true, columnHeaders: true, footer: true, toolbar: true },
+                columns: [
+                    { field: 'recid', text: 'ID', size: '120px', hidden: true },
+                    { field: 'pergunta', text: 'Pergunta', size: '45%' },
+                    { field: 'resposta', text: 'Resposta', size: '45%' },
+                    { field: 'nota', text: 'Nota', size: '10%', editable: { type: 'text' } },
+                ],
+                toolbar: {
+                    items: [
+                        { id: 'show-error-message', type: 'button', text: 'Mensagem de Erro', icon: 'w2ui-icon-cross', disabled: true },
+                        { type: 'break' },
+                        { id: 'show-correct-answer', type: 'button', text: 'Mostrar Resposta Correta', icon: 'w2ui-icon-check', disabled: true },
+                        { type: 'break' },
+                        { id: 'show-answer', type: 'button', text: 'Mostrar Resposta', icon: 'w2ui-icon-info', disabled: true },
+                    ],
+                    onClick: (target, data) => {
+                        if (target == 'show-error-message') {
+                            let id = w2ui.user.getSelection()[0];
+                            let item = w2ui.user.get(id);
+                            if (!item.error_msg.length) {
+                                return;
+                            }
+                            return w2popup.open({
+                                title: 'Mensagem de Erro ao Executar Query',
+                                body: `
+                                <div class="row justify-content-center text-center">
+                                    <div class="col-12" style="margin-top:10px">
+                                        ${item.error_msg}
+                                    </div>
+                                </div>`
+                            });
+                        }
+
+                        if (target == 'show-correct-answer') {
+                            let id = w2ui.user.getSelection()[0];
+                            let item = w2ui.user.get(id);
+                            return w2popup.open({
+                                title: 'Resposta (Query) Correta',
+                                body: `
+                                <div class="row justify-content-center text-center">
+                                    <div class="col-12" style="margin-top:10px">
+                                        ${item.resposta_correta}
+                                    </div>
+                                </div>`
+                            });
+                        }
+
+                        if (target = 'show-answer') {
+                            let id = w2ui.user.getSelection()[0];
+                            let item = w2ui.user.get(id);
+                            return w2popup.open({
+                                title: 'Sua Resposta (Query)',
+                                body: `
+                                <div class="row justify-content-center text-center">
+                                    <div class="col-12" style="margin-top:10px">
+                                        ${item.resposta}
+                                    </div>
+                                </div>`
+                            });
+                        }
+                    },
+                },
+                records: records,
+                onSelect: event => {
+                    let item = w2ui.user.get(event.recid);
+
+                    w2ui.user.toolbar.items.forEach( e => {
+                        if (e.id == 'show-correct-answer') {
+                            e.disabled = false;
+                        }
+
+                        if (e.id == 'show-error-message') {
+                            if (item.error_msg.length > 0) {
+                                e.disabled = false;
+                            } else {
+                                e.disabled = true;
+                            }
+                        }
+
+                        if (e.id == 'show-answer') {
+                            e.disabled = false;
+                        }
+                    });
+                    w2ui.user.refresh();
+                },
+                onUnselect: event => {
+                    w2ui.user.toolbar.items.forEach( e => {
+                        if (e.id =='show-correct-answer') {
+                            e.disabled = true;
+                        }
+                        if (e.id =='show-error-message') {
+                            e.disabled = true;
+                        }
+                        if (e.id == 'show-answer') {
+                            e.disabled = true;
+                        }
+                    });
+                    w2ui.user.refresh();
+                }
+            });
+        }, 2000);
         @endif
     });
 </script>
